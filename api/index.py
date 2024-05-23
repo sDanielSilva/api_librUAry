@@ -105,10 +105,10 @@ def get_books():
             'author': book.author,
             'published_date': book.published_date,
             'isbn': book.isbn,
-            'language': book.language
-            'image' : book.image
-            'pages' : book.pages
-            'publisher' : book.publisher
+            'language': book.language,
+            'image': book.image,  # Incluindo o link da imagem
+            'pages': book.pages,  # Incluindo o número de páginas
+            'publisher': book.publisher  # Incluindo o nome do editor
         }
         output.append(book_data)
     return jsonify({'books': output})
