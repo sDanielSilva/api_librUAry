@@ -9,7 +9,7 @@ from flask_migrate import Migrate
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-db = SQLAlchemy(app)
+db.init_app(app)
 migrate = Migrate(app, db)
 
 class User(db.Model):
@@ -161,6 +161,10 @@ def add_book():
         )
         db.session.add(book)
         db.session.commit()
+
+    user_book = UserBook.query.filter_by(user_id=user_id, book_id=book.id).first()
+    if user_book:
+        return jsonify({'message': 'Book already added to user library'}), 400
 
     user_book = UserBook(user_id=user_id, book_id=book.id)
     db.session.add(user_book)
