@@ -28,6 +28,9 @@ class Book(db.Model):
     published_date = db.Column(db.Date)
     isbn = db.Column(db.String(13), unique=True, nullable=False)
     language = db.Column(db.String(50))
+    image = db.Column(db.String(255))
+    pages = db.Column(db.Integer)
+    publisher = db.Column(db.String(100))
     reviews = db.relationship('Review', order_by='Review.id', back_populates='book')
     user_books = db.relationship('UserBook', order_by='UserBook.id', back_populates='book')
 
@@ -103,6 +106,9 @@ def get_books():
             'published_date': book.published_date,
             'isbn': book.isbn,
             'language': book.language
+            'image' : book.image
+            'pages' : book.pages
+            'publisher' : book.publisher
         }
         output.append(book_data)
     return jsonify({'books': output})
@@ -150,7 +156,9 @@ def add_book():
         title = book_info.get('title', 'N/A')
         author = ', '.join(book_info.get('authors', []))
         language = book_info.get('language', 'N/A')
-        from datetime import datetime
+        image = book_info.get('imageLinks', {}).get('thumbnail')  # Obtendo o link da imagem da API do Google Books
+        pages = book_info.get('pageCount')
+        publisher = book_info.get('publisher')
         
         def format_published_date(published_date):
             try:
@@ -165,7 +173,10 @@ def add_book():
             author=author,
             published_date=published_date,
             isbn=isbn,
-            language=language
+            language=language,
+            image=image,  # Armazenando o link da imagem na coluna 'image'
+            pages=pages,  # Armazenando o número de páginas na coluna 'pages'
+            publisher=publisher  # Armazenando o nome do editor na coluna 'publisher'
         )
         db.session.add(book)
         db.session.commit()
