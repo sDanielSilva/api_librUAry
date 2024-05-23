@@ -93,7 +93,7 @@ def login():
 
 @app.route('/books', methods=['GET'])
 def get_books():
-    response = requests.get('https://www.googleapis.com/books/v1/volumes?q=free')
+    response = requests.get('https://www.googleapis.com/books/v1/volumes?q=books')
     books = response.json().get('items', [])
     output = []
     for book in books:
