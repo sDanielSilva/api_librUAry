@@ -93,15 +93,16 @@ def login():
 
 @app.route('/books', methods=['GET'])
 def get_books():
-    response = requests.get('https://www.googleapis.com/books/v1/volumes?q=books')
-    books = response.json().get('items', [])
+    books = Book.query.all()
     output = []
     for book in books:
-        book_info = book.get('volumeInfo', {})
         book_data = {
-            'title': book_info.get('title', 'N/A'),
-            'author': ', '.join(book_info.get('authors', [])),
-            'description': book_info.get('description', 'No description available')
+            'id': book.id,
+            'title': book.title,
+            'author': book.author,
+            'published_date': book.published_date,
+            'isbn': book.isbn,
+            'language': book.language
         }
         output.append(book_data)
     return jsonify({'books': output})
