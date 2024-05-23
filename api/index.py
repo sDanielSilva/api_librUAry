@@ -255,6 +255,13 @@ def get_book_reviews(isbn):
         app.logger.error(f'Error fetching book reviews: {e}')
         return jsonify({'message': 'Error fetching book reviews', 'error': str(e)}), 500
 
+@app.route('/user_books', methods=['GET'])
+def get_user_books():
+    user_id = session.get('user_id')  # Obtenha o ID do usuário da sessão
+    user_books = UserBook.query.filter_by(user_id=user_id).all()
+    output = [{'book_id': user_book.book_id} for user_book in user_books]
+    return jsonify({'user_books': output})
+
 # Configuração de Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
