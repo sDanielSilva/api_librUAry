@@ -9,15 +9,16 @@ from flask_migrate import Migrate
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-db = SQLAlchemy(app)
+db.init_app(app)
 migrate = Migrate(app, db)
 
-# Define models
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
+    reviews = db.relationship('Review', order_by='Review.id', back_populates='user')
+    user_books = db.relationship('UserBook', order_by='UserBook.id', back_populates='user')
 
 class Book(db.Model):
     __tablename__ = 'books'
@@ -25,8 +26,10 @@ class Book(db.Model):
     title = db.Column(db.String(100))
     author = db.Column(db.String(100))
     published_date = db.Column(db.Date)
-    isbn = db.Column(db.String(13))
+    isbn = db.Column(db.String(13), unique=True, nullable=False)
     language = db.Column(db.String(50))
+    reviews = db.relationship('Review', order_by='Review.id', back_populates='book')
+    user_books = db.relationship('UserBook', order_by='UserBook.id', back_populates='book')
 
 class Review(db.Model):
     __tablename__ = 'reviews'
@@ -35,16 +38,21 @@ class Review(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     review = db.Column(db.Text, nullable=False)
     rating = db.Column(db.Integer, nullable=False)
-
-    __table_args__ = (
-        db.CheckConstraint('rating >= 1 AND rating <= 5', name='rating_check'),
-    )
     
     book = db.relationship('Book', back_populates='reviews')
     user = db.relationship('User', back_populates='reviews')
 
-Book.reviews = db.relationship('Review', order_by=Review.id, back_populates='book')
-User.reviews = db.relationship('Review', order_by=Review.id, back_populates='user')
+class UserBook(db.Model):
+    __tablename__ = 'user_books'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
+    
+    user = db.relationship('User', back_populates='user_books')
+    book = db.relationship('Book', back_populates='user_books')
+
+User.user_books = db.relationship('UserBook', order_by=UserBook.id, back_populates='user')
+Book.user_books = db.relationship('UserBook', order_by=UserBook.id, back_populates='book')
 
 # API Routes
 @app.route('/register', methods=['POST'])
@@ -80,9 +88,7 @@ def login():
     data = request.get_json()
     user = User.query.filter_by(username=data['username']).first()
     if not user or not check_password_hash(user.password, data['password']):
-        return jsonify({'message': 'Login failed!'}), 401
-
-    session['user_id'] = user.id
+        return jsonify({'message': 'Login failed!'})
     return jsonify({'message': 'Logged in successfully!'})
 
 @app.route('/books', methods=['GET'])
@@ -103,35 +109,63 @@ def get_books():
 @app.route('/review', methods=['POST'])
 def add_review():
     data = request.get_json()
-    if not data or not all(k in data for k in ('book_id', 'user_id', 'review_text', 'rating')):
-        return jsonify({'message': 'Incomplete data provided'}), 400
-
-    try:
-        new_review = Review(
-            book_id=data['book_id'], 
-            user_id=data['user_id'], 
-            review=data['review_text'], 
-            rating=data['rating']
-        )
-        db.session.add(new_review)
-        db.session.commit()
-        return jsonify({'message': 'Review added successfully!'})
-    except Exception as e:
-        app.logger.error(f'Error occurred while adding review: {e}')
-        return jsonify({'message': 'Failed to add review', 'error': str(e)}), 500
+    new_review = Review(book_id=data['book_id'], user_id=data['user_id'], review=data['review_text'], rating=data['rating'])
+    db.session.add(new_review)
+    db.session.commit()
+    return jsonify({'message': 'Review added successfully!'})
 
 @app.route('/profile/<int:user_id>', methods=['GET'])
 def get_profile(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({'message': 'User not found'}), 404
-
     reviews = Review.query.filter_by(user_id=user_id).all()
     review_list = [{'book_id': review.book_id, 'review': review.review, 'rating': review.rating} for review in reviews]
     return jsonify({
         'username': user.username,
         'reviews': review_list
     })
+
+@app.route('/add_book', methods=['POST'])
+def add_book():
+    data = request.get_json()
+    isbn = data.get('isbn')
+    user_id = data.get('user_id')
+
+    if not isbn or not user_id:
+        return jsonify({'message': 'ISBN and user ID are required'}), 400
+
+    book = Book.query.filter_by(isbn=isbn).first()
+
+    if not book:
+        google_books_url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}'
+        response = requests.get(google_books_url)
+        book_data = response.json().get('items', [])
+
+        if not book_data:
+            return jsonify({'message': 'Book not found in Google Books API'}), 404
+
+        book_info = book_data[0].get('volumeInfo', {})
+        title = book_info.get('title', 'N/A')
+        author = ', '.join(book_info.get('authors', []))
+        published_date = book_info.get('publishedDate', None)
+        language = book_info.get('language', 'N/A')
+
+        book = Book(
+            title=title,
+            author=author,
+            published_date=published_date,
+            isbn=isbn,
+            language=language
+        )
+        db.session.add(book)
+        db.session.commit()
+
+    user_book = UserBook(user_id=user_id, book_id=book.id)
+    db.session.add(user_book)
+    db.session.commit()
+
+    return jsonify({'message': 'Book added to user library successfully!'})
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO)
