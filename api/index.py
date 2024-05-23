@@ -7,12 +7,14 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import datetime
 
+# Configurações do Flask
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+# Modelos
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
@@ -42,7 +44,6 @@ class Review(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     review = db.Column(db.Text, nullable=False)
     rating = db.Column(db.Integer, nullable=False)
-    
     book = db.relationship('Book', back_populates='reviews')
     user = db.relationship('User', back_populates='reviews')
 
@@ -51,14 +52,14 @@ class UserBook(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
-    
     user = db.relationship('User', back_populates='user_books')
     book = db.relationship('Book', back_populates='user_books')
 
+# Configurações de relacionamento
 User.user_books = db.relationship('UserBook', order_by=UserBook.id, back_populates='user')
 Book.user_books = db.relationship('UserBook', order_by=UserBook.id, back_populates='book')
 
-# API Routes
+# Rotas da API
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -90,17 +91,27 @@ def register():
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
-    user = User.query.filter_by(username=data['username']).first()
-    if not user or not check_password_hash(user.password, data['password']):
-        return jsonify({'message': 'Login failed!'})
+    if not data:
+        app.logger.error('No data provided in request')
+        return jsonify({'message': 'No data provided'}), 400
+
+    username = data.get('username')
+    password = data.get('password')
+    if not username or not password:
+        app.logger.error('Username or password not provided')
+        return jsonify({'message': 'Username and password are required'}), 400
+
+    user = User.query.filter_by(username=username).first()
+    if not user or not check_password_hash(user.password, password):
+        return jsonify({'message': 'Login failed!'}), 401
+
     return jsonify({'message': 'Logged in successfully!'})
 
 @app.route('/books', methods=['GET'])
 def get_books():
-    books = Book.query.all()
-    output = []
-    for book in books:
-        book_data = {
+    try:
+        books = Book.query.all()
+        output = [{
             'id': book.id,
             'title': book.title,
             'author': book.author,
@@ -110,33 +121,57 @@ def get_books():
             'image': book.image,
             'pages': book.pages,
             'publisher': book.publisher
-        }
-        output.append(book_data)
-    return jsonify({'books': output})
+        } for book in books]
+        return jsonify({'books': output})
+    except Exception as e:
+        app.logger.error(f'Error fetching books: {e}')
+        return jsonify({'message': 'Error fetching books', 'error': str(e)}), 500
 
 @app.route('/review', methods=['POST'])
 def add_review():
     data = request.get_json()
-    new_review = Review(book_id=data['book_id'], user_id=data['user_id'], review=data['review_text'], rating=data['rating'])
-    db.session.add(new_review)
-    db.session.commit()
-    return jsonify({'message': 'Review added successfully!'})
+    if not data:
+        app.logger.error('No data provided in request')
+        return jsonify({'message': 'No data provided'}), 400
+
+    book_id = data.get('book_id')
+    user_id = data.get('user_id')
+    review_text = data.get('review_text')
+    rating = data.get('rating')
+
+    if not book_id or not user_id or not review_text or rating is None:
+        app.logger.error('Missing data for adding review')
+        return jsonify({'message': 'Book ID, User ID, Review text, and Rating are required'}), 400
+
+    try:
+        new_review = Review(book_id=book_id, user_id=user_id, review=review_text, rating=rating)
+        db.session.add(new_review)
+        db.session.commit()
+        return jsonify({'message': 'Review added successfully!'})
+    except Exception as e:
+        app.logger.error(f'Error adding review: {e}')
+        return jsonify({'message': 'Error adding review', 'error': str(e)}), 500
 
 @app.route('/profile/<int:user_id>', methods=['GET'])
 def get_profile(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
-    reviews = Review.query.filter_by(user_id=user_id).all()
-    review_list = [{'book_id': review.book_id, 'review': review.review, 'rating': review.rating} for review in reviews]
-    return jsonify({
-        'username': user.username,
-        'reviews': review_list
-    })
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+
+        reviews = Review.query.filter_by(user_id=user_id).all()
+        review_list = [{'book_id': review.book_id, 'review': review.review, 'rating': review.rating} for review in reviews]
+        return jsonify({'username': user.username, 'reviews': review_list})
+    except Exception as e:
+        app.logger.error(f'Error fetching profile: {e}')
+        return jsonify({'message': 'Error fetching profile', 'error': str(e)}), 500
 
 @app.route('/add_book', methods=['POST'])
 def add_book():
     data = request.get_json()
+    if not data:
+        return jsonify({'message': 'No data provided'}), 400
+
     isbn = data.get('isbn')
     user_id = data.get('user_id')
 
@@ -147,68 +182,80 @@ def add_book():
 
     if not book:
         google_books_url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}'
-        response = requests.get(google_books_url)
-        book_data = response.json().get('items', [])
+        try:
+            response = requests.get(google_books_url)
+            response.raise_for_status()
+            book_data = response.json().get('items', [])
 
-        if not book_data:
-            return jsonify({'message': 'Book not found in Google Books API'}), 404
+            if not book_data:
+                return jsonify({'message': 'Book not found in Google Books API'}), 404
 
-        book_info = book_data[0].get('volumeInfo', {})
-        title = book_info.get('title', 'N/A')
-        author = ', '.join(book_info.get('authors', []))
-        language = book_info.get('language', 'N/A')
-        image = book_info.get('imageLinks', {}).get('thumbnail')
-        pages = book_info.get('pageCount')
-        publisher = book_info.get('publisher')
-        
-        def format_published_date(published_date):
-            try:
-                return datetime.datetime.strptime(published_date, '%Y-%m-%d').date()
-            except ValueError:
-                return datetime.datetime.strptime(published_date, '%Y').date().replace(day=1, month=1)
+            book_info = book_data[0].get('volumeInfo', {})
+            title = book_info.get('title', 'N/A')
+            author = ', '.join(book_info.get('authors', []))
+            language = book_info.get('language', 'N/A')
+            image = book_info.get('imageLinks', {}).get('thumbnail')
+            pages = book_info.get('pageCount')
+            publisher = book_info.get('publisher')
 
-        published_date = format_published_date(book_info.get('publishedDate', '1000'))
+            def format_published_date(published_date):
+                try:
+                    return datetime.datetime.strptime(published_date, '%Y-%m-%d').date()
+                except ValueError:
+                    return datetime.datetime.strptime(published_date, '%Y').date().replace(day=1, month=1)
 
-        book = Book(
-            title=title,
-            author=author,
-            published_date=published_date,
-            isbn=isbn,
-            language=language,
-            image=image,
-            pages=pages,
-            publisher=publisher
-        )
-        db.session.add(book)
-        db.session.commit()
+            published_date = format_published_date(book_info.get('publishedDate', '1000'))
+
+            book = Book(
+                title=title,
+                author=author,
+                published_date=published_date,
+                isbn=isbn,
+                language=language,
+                image=image,
+                pages=pages,
+                publisher=publisher
+            )
+            db.session.add(book)
+            db.session.commit()
+        except requests.exceptions.RequestException as e:
+            app.logger.error(f'Error fetching book data from Google Books API: {e}')
+            return jsonify({'message': 'Error fetching book data from Google Books API', 'error': str(e)}), 500
 
     user_book = UserBook.query.filter_by(user_id=user_id, book_id=book.id).first()
     if user_book:
         return jsonify({'message': 'Book already added to user library'}), 400
 
-    user_book = UserBook(user_id=user_id, book_id=book.id)
-    db.session.add(user_book)
-    db.session.commit()
-
-    return jsonify({'message': 'Book added to user library successfully!'})
+    try:
+        user_book = UserBook(user_id=user_id, book_id=book.id)
+        db.session.add(user_book)
+        db.session.commit()
+        return jsonify({'message': 'Book added to user library successfully!'})
+    except Exception as e:
+        app.logger.error(f'Error adding book to user library: {e}')
+        return jsonify({'message': 'Error adding book to user library', 'error': str(e)}), 500
 
 @app.route('/book_reviews/<string:isbn>', methods=['GET'])
 def get_book_reviews(isbn):
-    book = Book.query.filter_by(isbn=isbn).first()
-    if not book:
-        return jsonify({'message': 'Book not found'}), 404
+    try:
+        book = Book.query.filter_by(isbn=isbn).first()
+        if not book:
+            return jsonify({'message': 'Book not found'}), 404
 
-    reviews = Review.query.filter_by(book_id=book.id).all()
-    review_list = [{'id': review.id, 'user_id': review.user_id, 'review': review.review, 'rating': review.rating} for review in reviews]
+        reviews = Review.query.filter_by(book_id=book.id).all()
+        review_list = [{'id': review.id, 'user_id': review.user_id, 'review': review.review, 'rating': review.rating} for review in reviews]
 
-    return jsonify({'book': {
-        'id': book.id,
-        'title': book.title,
-        'author': book.author,
-        'isbn': book.isbn
-    }, 'reviews': review_list})
+        return jsonify({'book': {
+            'id': book.id,
+            'title': book.title,
+            'author': book.author,
+            'isbn': book.isbn
+        }, 'reviews': review_list})
+    except Exception as e:
+        app.logger.error(f'Error fetching book reviews: {e}')
+        return jsonify({'message': 'Error fetching book reviews', 'error': str(e)}), 500
 
-# Logging Configuration
+# Configuração de Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
