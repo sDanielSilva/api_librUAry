@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+import datetime
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
@@ -106,9 +107,9 @@ def get_books():
             'published_date': book.published_date,
             'isbn': book.isbn,
             'language': book.language,
-            'image': book.image,  # Incluindo o link da imagem
-            'pages': book.pages,  # Incluindo o número de páginas
-            'publisher': book.publisher  # Incluindo o nome do editor
+            'image': book.image,
+            'pages': book.pages,
+            'publisher': book.publisher
         }
         output.append(book_data)
     return jsonify({'books': output})
@@ -156,15 +157,15 @@ def add_book():
         title = book_info.get('title', 'N/A')
         author = ', '.join(book_info.get('authors', []))
         language = book_info.get('language', 'N/A')
-        image = book_info.get('imageLinks', {}).get('thumbnail')  # Obtendo o link da imagem da API do Google Books
+        image = book_info.get('imageLinks', {}).get('thumbnail')
         pages = book_info.get('pageCount')
         publisher = book_info.get('publisher')
         
         def format_published_date(published_date):
             try:
-                return datetime.strptime(published_date, '%Y-%m-%d').date()
+                return datetime.datetime.strptime(published_date, '%Y-%m-%d').date()
             except ValueError:
-                return datetime.strptime(published_date, '%Y').date().replace(day=1, month=1)
+                return datetime.datetime.strptime(published_date, '%Y').date().replace(day=1, month=1)
 
         published_date = format_published_date(book_info.get('publishedDate', '1000'))
 
@@ -174,9 +175,9 @@ def add_book():
             published_date=published_date,
             isbn=isbn,
             language=language,
-            image=image,  # Armazenando o link da imagem na coluna 'image'
-            pages=pages,  # Armazenando o número de páginas na coluna 'pages'
-            publisher=publisher  # Armazenando o nome do editor na coluna 'publisher'
+            image=image,
+            pages=pages,
+            publisher=publisher
         )
         db.session.add(book)
         db.session.commit()
@@ -190,6 +191,22 @@ def add_book():
     db.session.commit()
 
     return jsonify({'message': 'Book added to user library successfully!'})
+
+@app.route('/book_reviews/<string:isbn>', methods=['GET'])
+def get_book_reviews(isbn):
+    book = Book.query.filter_by(isbn=isbn).first()
+    if not book:
+        return jsonify({'message': 'Book not found'}), 404
+
+    reviews = Review.query.filter_by(book_id=book.id).all()
+    review_list = [{'id': review.id, 'user_id': review.user_id, 'review': review.review, 'rating': review.rating} for review in reviews]
+
+    return jsonify({'book': {
+        'id': book.id,
+        'title': book.title,
+        'author': book.author,
+        'isbn': book.isbn
+    }, 'reviews': review_list})
 
 # Logging Configuration
 logging.basicConfig(level=logging.INFO)
