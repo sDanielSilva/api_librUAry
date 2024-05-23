@@ -34,7 +34,11 @@ class Review(db.Model):
     book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     review = db.Column(db.Text, nullable=False)
-    rating = db.Column(db.Integer, nullable=False, check='rating >= 1 AND rating <= 5')
+    rating = db.Column(db.Integer, nullable=False)
+
+    __table_args__ = (
+        db.CheckConstraint('rating >= 1 AND rating <= 5', name='rating_check'),
+    )
     
     book = db.relationship('Book', back_populates='reviews')
     user = db.relationship('User', back_populates='reviews')
