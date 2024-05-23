@@ -105,7 +105,8 @@ def login():
     if not user or not check_password_hash(user.password, password):
         return jsonify({'message': 'Login failed!'}), 401
 
-    return jsonify({'message': 'Logged in successfully!'})
+    # Inclua o userId na resposta
+    return jsonify({'message': 'Logged in successfully!', 'userId': user.id})
 
 @app.route('/books', methods=['GET'])
 def get_books():
