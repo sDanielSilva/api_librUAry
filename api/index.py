@@ -149,11 +149,16 @@ def add_book():
         book_info = book_data[0].get('volumeInfo', {})
         title = book_info.get('title', 'N/A')
         author = ', '.join(book_info.get('authors', []))
-        from datetime import datetime
-
-        published_date = datetime.strptime(book_info.get('publishedDate', '1900-01-01'), '%Y-%m-%d').date()
-
         language = book_info.get('language', 'N/A')
+        from datetime import datetime
+        
+        def format_published_date(published_date):
+            try:
+                return datetime.strptime(published_date, '%Y-%m-%d').date()
+            except ValueError:
+                return datetime.strptime(published_date, '%Y').date().replace(day=1, month=1)
+
+        published_date = format_published_date(book_info.get('publishedDate', '1000'))
 
         book = Book(
             title=title,
