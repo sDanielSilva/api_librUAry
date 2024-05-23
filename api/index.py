@@ -128,6 +128,30 @@ def get_books():
         app.logger.error(f'Error fetching books: {e}')
         return jsonify({'message': 'Error fetching books', 'error': str(e)}), 500
 
+@app.route('/book/<int:book_id>', methods=['GET'])
+def get_book(book_id):
+    try:
+        book = Book.query.get(book_id)
+        if book is None:
+            return jsonify({'message': 'Book not found'}), 404
+
+        output = {
+            'id': book.id,
+            'title': book.title,
+            'author': book.author,
+            'published_date': book.published_date,
+            'isbn': book.isbn,
+            'language': book.language,
+            'image': book.image,
+            'pages': book.pages,
+            'publisher': book.publisher
+        }
+        return jsonify({'book': output})
+    except Exception as e:
+        app.logger.error(f'Error fetching book: {e}')
+        return jsonify({'message': 'Error fetching book', 'error': str(e)}), 500
+
+
 @app.route('/review', methods=['POST'])
 def add_review():
     data = request.get_json()
