@@ -31,10 +31,10 @@ class Book(db.Model):
 class Review(db.Model):
     __tablename__ = 'reviews'
     id = db.Column(db.Integer, primary_key=True)
-    book_id = db.Column(db.Integer, db.ForeignKey('book.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     review = db.Column(db.Text, nullable=False)
-    rating = db.Column(db.Integer, nullable=False)
+    rating = db.Column(db.Integer, nullable=False, check='rating >= 1 AND rating <= 5')
     
     book = db.relationship('Book', back_populates='reviews')
     user = db.relationship('User', back_populates='reviews')
@@ -76,7 +76,9 @@ def login():
     data = request.get_json()
     user = User.query.filter_by(username=data['username']).first()
     if not user or not check_password_hash(user.password, data['password']):
-        return jsonify({'message': 'Login failed!'})
+        return jsonify({'message': 'Login failed!'}), 401
+
+    session['user_id'] = user.id
     return jsonify({'message': 'Logged in successfully!'})
 
 @app.route('/books', methods=['GET'])
@@ -97,16 +99,29 @@ def get_books():
 @app.route('/review', methods=['POST'])
 def add_review():
     data = request.get_json()
-    new_review = Review(book_id=data['book_id'], user_id=data['user_id'], review=data['review_text'], rating=data['rating'])
-    db.session.add(new_review)
-    db.session.commit()
-    return jsonify({'message': 'Review added successfully!'})
+    if not data or not all(k in data for k in ('book_id', 'user_id', 'review_text', 'rating')):
+        return jsonify({'message': 'Incomplete data provided'}), 400
+
+    try:
+        new_review = Review(
+            book_id=data['book_id'], 
+            user_id=data['user_id'], 
+            review=data['review_text'], 
+            rating=data['rating']
+        )
+        db.session.add(new_review)
+        db.session.commit()
+        return jsonify({'message': 'Review added successfully!'})
+    except Exception as e:
+        app.logger.error(f'Error occurred while adding review: {e}')
+        return jsonify({'message': 'Failed to add review', 'error': str(e)}), 500
 
 @app.route('/profile/<int:user_id>', methods=['GET'])
 def get_profile(user_id):
     user = User.query.get(user_id)
     if not user:
         return jsonify({'message': 'User not found'}), 404
+
     reviews = Review.query.filter_by(user_id=user_id).all()
     review_list = [{'book_id': review.book_id, 'review': review.review, 'rating': review.rating} for review in reviews]
     return jsonify({
