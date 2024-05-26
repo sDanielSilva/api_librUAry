@@ -12,6 +12,7 @@ import datetime
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
@@ -56,10 +57,6 @@ class UserBook(db.Model):
     user = db.relationship('User', back_populates='user_books')
     book = db.relationship('Book', back_populates='user_books')
 
-# Configurações de relacionamento
-User.user_books = db.relationship('UserBook', order_by=UserBook.id, back_populates='user')
-Book.user_books = db.relationship('UserBook', order_by=UserBook.id, back_populates='book')
-
 # Rotas da API
 @app.route('/register', methods=['POST'])
 def register():
@@ -102,7 +99,7 @@ def login():
         app.logger.error('Username or password not provided')
         return jsonify({'message': 'Username and password are required'}), 400
 
-    user = User.filter_by(username=username)
+    user = User.query.filter_by(username=username).first()
     if not user or not check_password_hash(user.password, password):
         return jsonify({'message': 'Login failed!'}), 401
 
