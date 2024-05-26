@@ -5,3 +5,4 @@ Flask-Migrate==4.0.7
 requests
 psycopg2-binary==2.9.1
 Werkzeug>=2.0.0,<3.0.0
+PyJWT==2.3.0
