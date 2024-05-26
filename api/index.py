@@ -101,12 +101,17 @@ def login():
         app.logger.error('Username or password not provided')
         return jsonify({'message': 'Username and password are required'}), 400
 
-    user = User.query.filter_by(username=username).first()
+    user = User.filter_by(username=username)
     if not user or not check_password_hash(user.password, password):
         return jsonify({'message': 'Login failed!'}), 401
 
-    # Inclua o userId na resposta
-    return jsonify({'message': 'Logged in successfully!', 'userId': user.id})
+    # Geração do token JWT
+    token = jwt.encode({
+        'user_id': user.id,
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+    }, app.config['SECRET_KEY'], algorithm='HS256')
+
+    return jsonify({'message': 'Logged in successfully!', 'token': token})
 
 @app.route('/books', methods=['GET'])
 def get_books():
