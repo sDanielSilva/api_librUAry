@@ -77,6 +77,10 @@ def token_required(f):
     return decorated
 
 # Rotas da API
+@app.route('/', methods = ["GET"])
+def home():
+    return "Welcome to libruary API!"
+
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
