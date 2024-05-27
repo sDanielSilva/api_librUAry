@@ -1,6 +1,11 @@
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
 import unittest
-from ..api.index import app, db, User, Book, Review, UserBook
+from api.index import app, db, User, Book, Review, UserBook
 from werkzeug.security import generate_password_hash
+
 
 class TestAPI(unittest.TestCase):
     def setUp(self):
