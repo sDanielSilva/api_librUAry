@@ -7,6 +7,7 @@ import jwt
 import datetime
 from functools import wraps
 from werkzeug.middleware.proxy_fix import ProxyFix
+import logging
 
 # Configurações do Flask
 app = Flask(__name__)
