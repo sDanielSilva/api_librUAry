@@ -1,7 +1,7 @@
 import os
 import logging
 import requests
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -75,6 +75,15 @@ def token_required(f):
     return decorated
 
 # Rotas da API
+@app.route('/', methods = ["GET"])
+def home():
+    return "Welcome to libruary API!"
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -318,4 +327,4 @@ logger = logging.getLogger(__name__)
 if __name__ == "__main__":
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app)
-    app.run()
+    app.run(host='0.0.0.0')
