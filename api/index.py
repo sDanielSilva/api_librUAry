@@ -9,6 +9,7 @@ import jwt
 import datetime
 from functools import wraps
 from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 
 # Configurações do Flask
 app = Flask(__name__)
