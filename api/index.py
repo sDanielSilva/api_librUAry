@@ -84,6 +84,10 @@ def home():
 def favicon():
     return send_from_directory(os.path.dirname(os.path.realpath(__file__)), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@app.route('/favicon.png')
+def favicon():
+    return send_from_directory(os.path.dirname(os.path.realpath(__file__)), 'favicon.png', mimetype='image/png')
+
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
