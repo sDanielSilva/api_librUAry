@@ -1,12 +1,12 @@
-import os
-import logging
-import requests
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 import jwt
 import datetime
+from functools import wraps
+from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_caching import Cache
 
 # Configurações do Flask
 app = Flask(__name__)
@@ -57,23 +57,36 @@ class UserBook(db.Model):
     user = db.relationship('User', back_populates='user_books')
     book = db.relationship('Book', back_populates='user_books')
 
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        if 'x-access-token' in request.headers:
+            token = request.headers['x-access-token']
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 401
+        try:
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            current_user = User.query.filter_by(id=data['user_id']).first()
+        except:
+            return jsonify({'message': 'Token is invalid!'}), 401
+        return f(current_user, *args, **kwargs)
+    return decorated
+
 # Rotas da API
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
     if not data:
-        app.logger.error('No data provided in request')
         return jsonify({'message': 'No data provided'}), 400
 
     username = data.get('username')
     password = data.get('password')
     if not username or not password:
-        app.logger.error('Username or password not provided')
         return jsonify({'message': 'Username and password are required'}), 400
 
     existing_user = User.query.filter_by(username=username).first()
     if existing_user:
-        app.logger.error('Username already exists')
         return jsonify({'message': 'Username already exists'}), 400
 
     try:
@@ -83,20 +96,17 @@ def register():
         db.session.commit()
         return jsonify({'message': 'Registered successfully!'})
     except Exception as e:
-        app.logger.error(f'Error occurred during registration: {e}')
         return jsonify({'message': 'Registration failed', 'error': str(e)}), 500
 
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     if not data:
-        app.logger.error('No data provided in request')
         return jsonify({'message': 'No data provided'}), 400
 
     username = data.get('username')
     password = data.get('password')
     if not username or not password:
-        app.logger.error('Username or password not provided')
         return jsonify({'message': 'Username and password are required'}), 400
 
     user = User.query.filter_by(username=username).first()
@@ -111,7 +121,10 @@ def login():
 
     return jsonify({'message': 'Logged in successfully!', 'token': token})
 
+cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+
 @app.route('/books', methods=['GET'])
+@cache.cached(timeout=50)
 def get_books():
     try:
         books = Book.query.all()
@@ -128,7 +141,6 @@ def get_books():
         } for book in books]
         return jsonify({'books': output})
     except Exception as e:
-        app.logger.error(f'Error fetching books: {e}')
         return jsonify({'message': 'Error fetching books', 'error': str(e)}), 500
 
 @app.route('/book/<int:book_id>', methods=['GET'])
@@ -151,15 +163,12 @@ def get_book(book_id):
         }
         return jsonify({'book': output})
     except Exception as e:
-        app.logger.error(f'Error fetching book: {e}')
         return jsonify({'message': 'Error fetching book', 'error': str(e)}), 500
-
 
 @app.route('/review', methods=['POST'])
 def add_review():
     data = request.get_json()
     if not data:
-        app.logger.error('No data provided in request')
         return jsonify({'message': 'No data provided'}), 400
 
     book_id = data.get('book_id')
@@ -168,7 +177,6 @@ def add_review():
     rating = data.get('rating')
 
     if not book_id or not user_id or not review_text or rating is None:
-        app.logger.error('Missing data for adding review')
         return jsonify({'message': 'Book ID, User ID, Review text, and Rating are required'}), 400
 
     try:
@@ -177,7 +185,6 @@ def add_review():
         db.session.commit()
         return jsonify({'message': 'Review added successfully!'})
     except Exception as e:
-        app.logger.error(f'Error adding review: {e}')
         return jsonify({'message': 'Error adding review', 'error': str(e)}), 500
 
 @app.route('/profile/<int:user_id>', methods=['GET'])
@@ -191,7 +198,6 @@ def get_profile(user_id):
         review_list = [{'book_id': review.book_id, 'review': review.review, 'rating': review.rating} for review in reviews]
         return jsonify({'username': user.username, 'reviews': review_list})
     except Exception as e:
-        app.logger.error(f'Error fetching profile: {e}')
         return jsonify({'message': 'Error fetching profile', 'error': str(e)}), 500
 
 @app.route('/add_book', methods=['POST'])
@@ -299,11 +305,15 @@ def get_user_books(user_id):
     output = [{'book_id': user_book.book_id} for user_book in user_books]
     return jsonify({'user_books': output})
 
-# Configuração de Logging
+@app.errorhandler(Exception)
+def handle_error(e):
+    app.logger.error(f'Error occurred: {e}')
+    return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.run(ssl_context=('cert.pem', 'key.pem'))
     app.wsgi_app = ProxyFix(app.wsgi_app)
     app.run()
