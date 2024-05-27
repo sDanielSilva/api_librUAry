@@ -7,7 +7,6 @@ import jwt
 import datetime
 from functools import wraps
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask_caching import Cache
 
 # Configurações do Flask
 app = Flask(__name__)
@@ -122,10 +121,8 @@ def login():
 
     return jsonify({'message': 'Logged in successfully!', 'token': token})
 
-cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 @app.route('/books', methods=['GET'])
-@cache.cached(timeout=50)
 def get_books():
     try:
         books = Book.query.all()
