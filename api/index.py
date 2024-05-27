@@ -1,4 +1,5 @@
 import os
+print(os.listdir(os.path.dirname(os.path.realpath(__file__))))
 import logging
 import requests
 from flask import Flask, request, jsonify, session, send_from_directory
