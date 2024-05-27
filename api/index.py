@@ -315,6 +315,5 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    app.run(ssl_context=('cert.pem', 'key.pem'))
     app.wsgi_app = ProxyFix(app.wsgi_app)
     app.run()
