@@ -9,7 +9,6 @@ import jwt
 import datetime
 from functools import wraps
 from werkzeug.middleware.proxy_fix import ProxyFix
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 
 # Configurações do Flask
 app = Flask(__name__)
@@ -323,4 +322,4 @@ logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     app.wsgi_app = ProxyFix(app.wsgi_app)
-    app.run()
+    app.run(host='0.0.0.0')
