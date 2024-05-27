@@ -167,6 +167,7 @@ def get_book(book_id):
         return jsonify({'message': 'Error fetching book', 'error': str(e)}), 500
 
 @app.route('/review', methods=['POST'])
+@token_required
 def add_review():
     data = request.get_json()
     if not data:
@@ -189,6 +190,7 @@ def add_review():
         return jsonify({'message': 'Error adding review', 'error': str(e)}), 500
 
 @app.route('/profile/<int:user_id>', methods=['GET'])
+@token_required
 def get_profile(user_id):
     try:
         user = User.query.get(user_id)
@@ -202,6 +204,7 @@ def get_profile(user_id):
         return jsonify({'message': 'Error fetching profile', 'error': str(e)}), 500
 
 @app.route('/add_book', methods=['POST'])
+@token_required
 def add_book():
     data = request.get_json()
     if not data:
