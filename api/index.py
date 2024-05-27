@@ -1,5 +1,7 @@
 import os
-from flask import Flask, request, jsonify
+import logging
+import requests
+from flask import Flask, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -7,7 +9,6 @@ import jwt
 import datetime
 from functools import wraps
 from werkzeug.middleware.proxy_fix import ProxyFix
-import logging
 
 # Configurações do Flask
 app = Flask(__name__)
