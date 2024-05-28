@@ -1,20 +1,22 @@
 import os
-print(os.listdir(os.path.dirname(os.path.realpath(__file__))))
-import logging
+import datetime
+from functools import wraps
+import jwt
 import requests
-from flask import Flask, request, jsonify, session, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-import jwt
-import datetime
-from functools import wraps
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configurações do Flask
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Inicialização dos componentes do Flask
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
@@ -59,19 +61,20 @@ class UserBook(db.Model):
     user = db.relationship('User', back_populates='user_books')
     book = db.relationship('Book', back_populates='user_books')
 
+# Funções auxiliares
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = None
-        if 'x-access-token' in request.headers:
-            token = request.headers['x-access-token']
+        token = request.headers.get('x-access-token')
         if not token:
-            return jsonify({'message': 'Token is missing!'}), 401
+            return jsonify({'error': 'Token is missing!'}), 401
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            current_user = User.query.filter_by(id=data['user_id']).first()
-        except:
-            return jsonify({'message': 'Token is invalid!'}), 401
+            current_user = User.query.get(data['user_id'])
+        except jwt.ExpiredSignatureError:
+            return jsonify({'error': 'Token has expired'}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({'error': 'Invalid token'}), 401
         return f(current_user, *args, **kwargs)
     return decorated
 
@@ -316,15 +319,21 @@ def get_user_books(user_id):
     output = [{'book_id': user_book.book_id} for user_book in user_books]
     return jsonify({'user_books': output})
 
-@app.errorhandler(Exception)
-def handle_error(e):
-    app.logger.error(f'Error occurred: {e}')
-    return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
+# Tratamento de Erros
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not found'}), 404
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({'error': 'Bad request'}), 400
 
-if __name__ == "__main__":
-    from werkzeug.middleware.proxy_fix import ProxyFix
-    app.wsgi_app = ProxyFix(app.wsgi_app)
+@app.errorhandler(500)
+def server_error(error):
+    return jsonify({'error': 'Server error'}), 500
+
+# Inicialização do Logger
+if __name__ == '__main__':
+    import logging
+    logging.basicConfig(filename='api.log', level=logging.INFO)
     app.run(host='0.0.0.0')
