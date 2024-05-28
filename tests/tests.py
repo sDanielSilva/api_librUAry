@@ -9,8 +9,14 @@ from werkzeug.security import generate_password_hash
 
 class TestAPI(unittest.TestCase):
     def setUp(self):
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db' //linnk para a nossa bd
         self.app = app.test_client()
         self.db = db
+        self.db.create_all()
+
+    def tearDown(self):
+        self.db.session.remove()
+        self.db.drop_all()
 
     def test_register(self):
         response = self.app.post('/register', json={'username': 'test', 'password': 'test'})
