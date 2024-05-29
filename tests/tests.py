@@ -1,10 +1,10 @@
-import os
-import unittest
-from dotenv import load_dotenv
-from api.index import app, db, User, Book, Review, UserBook
-from werkzeug.security import generate_password_hash
+#import os
+#import unittest
+#from dotenv import load_dotenv
+#from api.index import app, db, User, Book, Review, UserBook
+#from werkzeug.security import generate_password_hash
 
-load_dotenv()
+#load_dotenv()
 
 class TestAPI(unittest.TestCase):
     def setUp(self):
