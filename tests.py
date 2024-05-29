@@ -1,21 +1,23 @@
 import os
 import unittest
+from dotenv import load_dotenv
 from api.index import app, db, User, Book, Review, UserBook
 from werkzeug.security import generate_password_hash
 
+load_dotenv()
+
 class TestAPI(unittest.TestCase):
     def setUp(self):
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
-        app.config['TESTING'] = True
         self.app = app.test_client()
-        with app.app_context():
-            db.create_all()
+        self.app_context = app.app_context()
+        self.app_context.push()
+        db.create_all()
         self.create_test_user()
 
     def tearDown(self):
-        with app.app_context():
-            db.session.remove()
-            db.drop_all()
+        db.session.remove()
+        db.drop_all()
+        self.app_context.pop()
         if os.path.exists('test.db'):
             os.remove('test.db')
 
