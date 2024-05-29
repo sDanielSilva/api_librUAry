@@ -1,47 +1,56 @@
 import os
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
 import unittest
 from api.index import app, db, User, Book, Review, UserBook
 from werkzeug.security import generate_password_hash
 
-
 class TestAPI(unittest.TestCase):
     def setUp(self):
-        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db' //linnk para a nossa bd
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
+        app.config['TESTING'] = True
         self.app = app.test_client()
-        self.db = db
-        self.db.create_all()
+        with app.app_context():
+            db.create_all()
+        self.create_test_user()
 
     def tearDown(self):
-        self.db.session.remove()
-        self.db.drop_all()
+        with app.app_context():
+            db.session.remove()
+            db.drop_all()
+        if os.path.exists('test.db'):
+            os.remove('test.db')
 
-    def test_register(self):
-        response = self.app.post('/register', json={'username': 'test', 'password': 'test'})
-        self.assertEqual(response.status_code, 200)
-
-    def test_login(self):
+    def create_test_user(self):
         hashed_password = generate_password_hash('test', method='pbkdf2:sha256')
         test_user = User(username='test', password=hashed_password)
-        self.db.session.add(test_user)
-        self.db.session.commit()
+        db.session.add(test_user)
+        db.session.commit()
 
+    def test_register(self):
+        # Teste de registro de usuário
+        response = self.app.post('/register', json={'username': 'testuser', 'password': 'testpass'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Registered successfully!', response.get_json()['message'])
+
+    def test_login(self):
+        # Teste de login de usuário
         response = self.app.post('/login', json={'username': 'test', 'password': 'test'})
         self.assertEqual(response.status_code, 200)
+        self.assertIn('Logged in successfully!', response.get_json()['message'])
 
     def test_get_books(self):
+        # Teste de obtenção de livros
         response = self.app.get('/books')
         self.assertEqual(response.status_code, 200)
 
     def test_get_book(self):
+        # Teste de obtenção de um livro específico
         test_book = Book(title='Test Book', author='Test Author', isbn='1234567890123')
         self.db.session.add(test_book)
         self.db.session.commit()
 
         response = self.app.get(f'/book/{test_book.id}')
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()['book']['title'], 'Test Book')
 
     def test_add_review(self):
         test_user = User.query.filter_by(username='test').first()
