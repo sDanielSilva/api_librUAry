@@ -63,7 +63,6 @@ class UserBook(db.Model):
     user = db.relationship('User', back_populates='user_books')
     book = db.relationship('Book', back_populates='user_books')
 
-# Funções auxiliares
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -73,12 +72,15 @@ def token_required(f):
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
             current_user = User.query.get(data['user_id'])
+            if not current_user:
+                return jsonify({'error': 'Invalid token'}), 401
         except jwt.ExpiredSignatureError:
             return jsonify({'error': 'Token has expired'}), 401
         except jwt.InvalidTokenError:
             return jsonify({'error': 'Invalid token'}), 401
         return f(current_user, *args, **kwargs)
     return decorated
+
 
 # Rotas da API
 @app.route('/', methods = ["GET"])
@@ -203,8 +205,11 @@ def add_review(current_user):
 
 @app.route('/profile/<int:user_id>', methods=['GET'])
 @token_required
-def get_profile(user_id):
+def get_profile(current_user, user_id):
     try:
+        if current_user.id != user_id:
+            return jsonify({'message': 'Unauthorized'}), 403
+
         user = User.query.get(user_id)
         if not user:
             return jsonify({'message': 'User not found'}), 404
@@ -214,6 +219,7 @@ def get_profile(user_id):
         return jsonify({'username': user.username, 'reviews': review_list})
     except Exception as e:
         return jsonify({'message': 'Error fetching profile', 'error': str(e)}), 500
+
 
 @app.route('/add_book', methods=['POST'])
 @token_required
