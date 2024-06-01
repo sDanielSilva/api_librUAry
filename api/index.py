@@ -217,7 +217,7 @@ def get_profile(user_id):
 
 @app.route('/add_book', methods=['POST'])
 @token_required
-def add_book():
+def add_book(current_user):
     data = request.get_json()
     if not data:
         return jsonify({'message': 'No data provided'}), 400
