@@ -285,10 +285,10 @@ def add_book():
         app.logger.error(f'Error adding book to user library: {e}')
         return jsonify({'message': 'Error adding book to user library', 'error': str(e)}), 500
 
-@app.route('/book_reviews/<string:isbn>', methods=['GET'])
-def get_book_reviews(isbn):
+@app.route('/book_reviews/<int:book_id>', methods=['GET'])
+def get_book_reviews(book_id):
     try:
-        book = Book.query.filter_by(isbn=isbn).first()
+        book = Book.query.get(book_id)
         if not book:
             return jsonify({'message': 'Book not found'}), 404
 
