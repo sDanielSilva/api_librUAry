@@ -180,7 +180,7 @@ def get_book(book_id):
 
 @app.route('/review', methods=['POST'])
 @token_required
-def add_review():
+def add_review(current_user):
     data = request.get_json()
     if not data:
         return jsonify({'message': 'No data provided'}), 400
