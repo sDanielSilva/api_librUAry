@@ -313,18 +313,28 @@ def get_book_reviews(book_id):
 
 @app.route('/user_books/<int:user_id>', methods=['GET'])
 def get_user_books(user_id):
-    # Verifique se o usuário existe
     user = User.query.get(user_id)
     if not user:
         return jsonify({'message': 'User not found'}), 404
 
-    # Verifique se o usuário tem livros
-    user_books = UserBook.query.filter_by(user_id=user_id).all()
-    if not user_books:
-        return jsonify({'message': 'No books found for this user'}), 404
+    user_books = db.session.query(
+        UserBook.book_id,
+        Book.title,
+        Book.author,
+        Book.image,
+        Review.rating
+    ).join(Book, UserBook.book_id == Book.id
+    ).outerjoin(Review, db.and_(UserBook.book_id == Review.book_id, UserBook.user_id == Review.user_id)
+    ).filter(UserBook.user_id == user_id).all()
+    
+    output = [{
+        'book_id': user_book.book_id,
+        'title': user_book.title,
+        'author': user_book.author,
+        'image': user_book.image,
+        'rating': user_book.rating if user_book.rating is not None else 'Not Rated'
+    } for user_book in user_books]
 
-    # Obtenha os livros do usuário
-    output = [{'book_id': user_book.book_id} for user_book in user_books]
     return jsonify({'user_books': output})
 
 # Tratamento de Erros
