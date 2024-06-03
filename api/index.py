@@ -188,20 +188,28 @@ def add_review(current_user):
         return jsonify({'message': 'No data provided'}), 400
 
     book_id = data.get('book_id')
-    user_id = data.get('user_id')
     review_text = data.get('review_text')
     rating = data.get('rating')
 
-    if not book_id or not user_id or not review_text or rating is None:
-        return jsonify({'message': 'Book ID, User ID, Review text, and Rating are required'}), 400
+    if not book_id or not review_text or rating is None:
+        return jsonify({'message': 'Book ID, Review text, and Rating are required'}), 400
+
+    existing_review = Review.query.filter_by(book_id=book_id, user_id=current_user.id).first()
+
+    if existing_review:
+        existing_review.review = review_text
+        existing_review.rating = rating
+        message = 'Review updated successfully!'
+    else:
+        new_review = Review(book_id=book_id, user_id=current_user.id, review=review_text, rating=rating)
+        db.session.add(new_review)
+        message = 'Review added successfully!'
 
     try:
-        new_review = Review(book_id=book_id, user_id=user_id, review=review_text, rating=rating)
-        db.session.add(new_review)
         db.session.commit()
-        return jsonify({'message': 'Review added successfully!'})
+        return jsonify({'message': message})
     except Exception as e:
-        return jsonify({'message': 'Error adding review', 'error': str(e)}), 500
+        return jsonify({'message': 'Error adding/updating review', 'error': str(e)}), 500
 
 @app.route('/profile/<int:user_id>', methods=['GET'])
 @token_required
