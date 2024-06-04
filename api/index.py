@@ -161,7 +161,7 @@ def login():
     # Geração do token JWT
     token = jwt.encode({
         'user_id': user.id,
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=60)
     }, app.config['SECRET_KEY'], algorithm='HS256')
 
     # Inclua o userId na resposta
