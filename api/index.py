@@ -102,9 +102,11 @@ def validate_token():
     try:
         # Decodifica o token JWT
         decoded_token = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+
+        exp_date = datetime.datetime.fromtimestamp(decoded_token['exp'], tz=datetime.timezone.utc)
         
         # Verifica se o token expirou
-        if decoded_token['exp'] < datetime.datetime.now(datetime.timezone.utc):
+        if exp_date < datetime.datetime.now(datetime.timezone.utc):
             return jsonify({'is_valid': False, 'message': 'Token has expired'}), 401
         
         # O token é válido
