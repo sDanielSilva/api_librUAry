@@ -330,19 +330,32 @@ def add_book(current_user):
 @app.route('/book_reviews/<int:book_id>', methods=['GET'])
 def get_book_reviews(book_id):
     try:
+        page = request.args.get('page', 1, type=int)
+        size = request.args.get('size', 10, type=int)
         book = Book.query.get(book_id)
         if not book:
             return jsonify({'message': 'Book not found'}), 404
 
-        reviews = Review.query.filter_by(book_id=book.id).all()
-        review_list = [{'id': review.id, 'user_id': review.user_id, 'review': review.review, 'rating': review.rating} for review in reviews]
+        reviews_query = Review.query.filter_by(book_id=book.id)
+        reviews_page = reviews_query.paginate(page=page, per_page=size, error_out=False)
+        reviews = reviews_page.items
+        review_list = [
+            {'id': review.id, 'user_id': review.user_id, 'review': review.review, 'rating': review.rating}
+            for review in reviews
+        ]
 
-        return jsonify({'book': {
-            'id': book.id,
-            'title': book.title,
-            'author': book.author,
-            'isbn': book.isbn
-        }, 'reviews': review_list})
+        return jsonify({
+            'book': {
+                'id': book.id,
+                'title': book.title,
+                'author': book.author,
+                'isbn': book.isbn
+            },
+            'reviews': review_list,
+            'total_reviews': reviews_query.count(),
+            'page': page,
+            'pages': reviews_page.pages
+        })
     except Exception as e:
         app.logger.error(f'Error fetching book reviews: {e}')
         return jsonify({'message': 'Error fetching book reviews', 'error': str(e)}), 500
