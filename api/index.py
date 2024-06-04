@@ -104,7 +104,7 @@ def validate_token():
         decoded_token = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
         
         # Verifica se o token expirou
-        if decoded_token['exp'] < datetime.datetime.utcnow():
+        if decoded_token['exp'] < datetime.datetime.now(datetime.timezone.utc):
             return jsonify({'is_valid': False, 'message': 'Token has expired'}), 401
         
         # O token é válido
@@ -115,6 +115,7 @@ def validate_token():
     except jwt.InvalidTokenError:
         # O token é inválido
         return jsonify({'is_valid': False, 'message': 'Invalid token'}), 401
+
 
 @app.route('/register', methods=['POST'])
 def register():
