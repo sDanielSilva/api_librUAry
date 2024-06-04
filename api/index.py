@@ -91,6 +91,31 @@ def home():
 def favicon():
     return send_from_directory(os.path.dirname(os.path.realpath(__file__)), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@app.route('/validateToken', methods=['POST'])
+def validate_token():
+    data = request.get_json()
+    token = data.get('token')
+
+    if not token:
+        return jsonify({'message': 'Token is missing'}), 400
+
+    try:
+        # Decodifica o token JWT
+        decoded_token = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        
+        # Verifica se o token expirou
+        if decoded_token['exp'] < datetime.utcnow():
+            return jsonify({'is_valid': False, 'message': 'Token has expired'}), 401
+        
+        # O token é válido
+        return jsonify({'is_valid': True, 'message': 'Token is valid'})
+    except jwt.ExpiredSignatureError:
+        # O token expirou
+        return jsonify({'is_valid': False, 'message': 'Token has expired'}), 401
+    except jwt.InvalidTokenError:
+        # O token é inválido
+        return jsonify({'is_valid': False, 'message': 'Invalid token'}), 401
+
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
