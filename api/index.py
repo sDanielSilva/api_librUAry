@@ -104,7 +104,7 @@ def validate_token():
         decoded_token = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
         
         # Verifica se o token expirou
-        if decoded_token['exp'] < datetime.datetime.utcnow():
+        if decoded_token['exp'] < datetime.now(datetime.UTC):
             return jsonify({'is_valid': False, 'message': 'Token has expired'}), 401
         
         # O token é válido
@@ -158,7 +158,7 @@ def login():
     # Geração do token JWT
     token = jwt.encode({
         'user_id': user.id,
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+        'exp': datetime.now(datetime.UTC) + datetime.timedelta(seconds=30)
     }, app.config['SECRET_KEY'], algorithm='HS256')
 
     # Inclua o userId na resposta
