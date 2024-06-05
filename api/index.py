@@ -327,6 +327,23 @@ def add_book(current_user):
         app.logger.error(f'Error adding book to user library: {e}')
         return jsonify({'message': 'Error adding book to user library', 'error': str(e)}), 500
 
+@app.route('/remove_book/<int:user_id>/<int:book_id>', methods=['DELETE'])
+@token_required
+def remove_book_from_library(current_user, user_id, book_id):
+    if current_user.id != user_id:
+        return jsonify({'message': 'Unauthorized'}), 403
+
+    user_book = UserBook.query.filter_by(user_id=user_id, book_id=book_id).first()
+    if not user_book:
+        return jsonify({'message': 'Book not found in the library'}), 404
+
+    try:
+        db.session.delete(user_book)
+        db.session.commit()
+        return jsonify({'message': 'Book removed from library'})
+    except Exception as e:
+        return jsonify({'message': 'Failed to remove book', 'error': str(e)}), 500
+
 @app.route('/book_reviews/<int:book_id>', methods=['GET'])
 @token_required
 def get_book_reviews(current_user, book_id):
