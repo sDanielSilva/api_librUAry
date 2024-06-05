@@ -331,6 +331,7 @@ def add_book(current_user):
 @token_required
 def remove_book(current_user):
     data = request.get_json()
+    app.logger.info(f'Received data: {data}') 
     if not data:
         return jsonify({'message': 'No data provided'}), 400
 
