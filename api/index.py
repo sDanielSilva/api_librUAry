@@ -327,7 +327,7 @@ def add_book(current_user):
         app.logger.error(f'Error adding book to user library: {e}')
         return jsonify({'message': 'Error adding book to user library', 'error': str(e)}), 500
 
-@app.route('/remove_book/<int:user_id>/<int:book_id>', methods=['DELETE'])
+@app.route('/remove_book/<int:book_id>', methods=['DELETE'])
 @token_required
 def remove_book_from_library(current_user, user_id, book_id):
     if current_user.id != user_id:
