@@ -336,11 +336,13 @@ def get_book_reviews(book_id):
         if not book:
             return jsonify({'message': 'Book not found'}), 404
 
-        reviews_query = Review.query.filter_by(book_id=book.id)
+        reviews_query = db.session.query(
+            Review.id, User.username, Review.review, Review.rating
+        ).join(User, Review.user_id == User.id).filter(Review.book_id == book_id)
         reviews_page = reviews_query.paginate(page=page, per_page=size, error_out=False)
         reviews = reviews_page.items
         review_list = [
-            {'id': review.id, 'user_id': review.user_id, 'review': review.review, 'rating': review.rating}
+            {'id': review.id, 'username': review.username, 'review': review.review, 'rating': review.rating}
             for review in reviews
         ]
 
