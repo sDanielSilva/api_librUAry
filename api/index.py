@@ -327,22 +327,29 @@ def add_book(current_user):
         app.logger.error(f'Error adding book to user library: {e}')
         return jsonify({'message': 'Error adding book to user library', 'error': str(e)}), 500
 
-@app.route('/remove_book/<int:book_id>', methods=['DELETE'])
+@app.route('/remove_book', methods=['DELETE'])
 @token_required
-def remove_book_from_library(current_user, user_id, book_id):
-    if current_user.id != user_id:
-        return jsonify({'message': 'Unauthorized'}), 403
+def remove_book(current_user):
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': 'No data provided'}), 400
 
-    user_book = UserBook.query.filter_by(user_id=user_id, book_id=book_id).first()
+    book_id = data.get('book_id')
+    if not book_id:
+        return jsonify({'message': 'Book ID is required'}), 400
+
+    user_book = UserBook.query.filter_by(user_id=current_user.id, book_id=book_id).first()
     if not user_book:
-        return jsonify({'message': 'Book not found in the library'}), 404
+        return jsonify({'message': 'Book not found in user library'}), 404
 
     try:
         db.session.delete(user_book)
         db.session.commit()
-        return jsonify({'message': 'Book removed from library'})
+        return jsonify({'message': 'Book removed from user library successfully!'})
     except Exception as e:
-        return jsonify({'message': 'Failed to remove book', 'error': str(e)}), 500
+        app.logger.error(f'Error removing book from user library: {e}')
+        return jsonify({'message': 'Error removing book from user library', 'error': str(e)}), 500
+
 
 @app.route('/book_reviews/<int:book_id>', methods=['GET'])
 @token_required
