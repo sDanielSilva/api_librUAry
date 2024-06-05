@@ -391,32 +391,36 @@ def get_book_reviews(current_user, book_id):
         'pages': reviews_pagination.pages
     })
 
-
 @app.route('/user_books/<int:user_id>', methods=['GET'])
-def get_user_books(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
+@token_required
+def get_user_books(current_user, user_id):
+    if current_user.id != user_id:
+        return jsonify({'message': 'Unauthorized'}), 403
 
-    user_books = db.session.query(
-        UserBook.book_id,
-        Book.title,
-        Book.author,
-        Book.image,
-        Review.rating
-    ).join(Book, UserBook.book_id == Book.id
-    ).outerjoin(Review, db.and_(UserBook.book_id == Review.book_id, UserBook.user_id == Review.user_id)
-    ).filter(UserBook.user_id == user_id).all()
-    
-    output = [{
-        'book_id': user_book.book_id,
-        'title': user_book.title,
-        'author': user_book.author,
-        'image': user_book.image,
-        'rating': user_book.rating if user_book.rating is not None else 'Not Rated'
-    } for user_book in user_books]
+    try:
+        books_to_read = UserBook.query.filter_by(user_id=user_id, read=False).join(Book).all()
+        books_read = UserBook.query.filter_by(user_id=user_id, read=True).join(Book).all()
 
-    return jsonify({'user_books': output})
+        books_to_read_output = [{
+            'book_id': user_book.book.id,
+            'title': user_book.book.title,
+            'author': user_book.book.author,
+            'image': user_book.book.image
+        } for user_book in books_to_read]
+
+        books_read_output = [{
+            'book_id': user_book.book.id,
+            'title': user_book.book.title,
+            'author': user_book.book.author,
+            'image': user_book.book.image
+        } for user_book in books_read]
+
+        return jsonify({
+            'books_to_read': books_to_read_output,
+            'books_read': books_read_output
+        })
+    except Exception as e:
+        return jsonify({'message': 'Error fetching user books', 'error': str(e)}), 500
 
 # Tratamento de Erros
 @app.errorhandler(404)
