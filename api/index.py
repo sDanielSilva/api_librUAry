@@ -60,7 +60,7 @@ class UserBook(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
-    #read = db.Column(db.Boolean, default=False)
+    read = db.Column(db.Boolean, default=False)
     user = db.relationship('User', back_populates='user_books')
     book = db.relationship('Book', back_populates='user_books')
 
