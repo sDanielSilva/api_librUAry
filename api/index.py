@@ -327,13 +327,12 @@ def add_book(current_user):
         app.logger.error(f'Error adding book to user library: {e}')
         return jsonify({'message': 'Error adding book to user library', 'error': str(e)}), 500
 
-@app.route('/remove_book', methods=['DELETE'])
+@app.route('/remove_book', methods=['POST'])
 @token_required
 def remove_book(current_user):
     data = request.get_json()
-    app.logger.info(f'Received data: {data}') 
-    if not data:
-        return jsonify({'message': 'No data provided'}), 400
+    if not data or 'action' not in data or data['action'] != 'delete':
+        return jsonify({'message': 'Invalid action'}), 400
 
     book_id = data.get('book_id')
     if not book_id:
