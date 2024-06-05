@@ -60,7 +60,7 @@ class UserBook(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
-    read = db.Column(db.Boolean, default=False)
+    #read = db.Column(db.Boolean, default=False)
     user = db.relationship('User', back_populates='user_books')
     book = db.relationship('Book', back_populates='user_books')
 
@@ -328,24 +328,24 @@ def add_book(current_user):
         app.logger.error(f'Error adding book to user library: {e}')
         return jsonify({'message': 'Error adding book to user library', 'error': str(e)}), 500
 
-@app.route('/mark_book_as_read', methods=['POST'])
-@token_required
-def mark_book_as_read(current_user):
-    data = request.get_json()
-    book_id = data.get('book_id')
-    if not book_id:
-        return jsonify({'message': 'Book ID is required'}), 400
+#@app.route('/mark_book_as_read', methods=['POST'])
+#@token_required
+#def mark_book_as_read(current_user):
+   # data = request.get_json()
+    #book_id = data.get('book_id')
+   # if not book_id:
+   #     return jsonify({'message': 'Book ID is required'}), 400
 
-    user_book = UserBook.query.filter_by(user_id=current_user.id, book_id=book_id).first()
-    if not user_book:
-        return jsonify({'message': 'Book not found in user library'}), 404
+  #  user_book = UserBook.query.filter_by(user_id=current_user.id, book_id=book_id).first()
+  #  if not user_book:
+  #      return jsonify({'message': 'Book not found in user library'}), 404
 
-    try:
-        user_book.read = True 
-        db.session.commit()
-        return jsonify({'message': 'Book marked as read successfully!'})
-    except Exception as e:
-        return jsonify({'message': 'Error marking book as read', 'error': str(e)}), 500
+ #   try:
+     #   user_book.read = True 
+  #      db.session.commit()
+  #      return jsonify({'message': 'Book marked as read successfully!'})
+ #   except Exception as e:
+   #     return jsonify({'message': 'Error marking book as read', 'error': str(e)}), 500
 
 
 @app.route('/remove_book', methods=['POST'])
