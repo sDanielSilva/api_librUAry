@@ -381,7 +381,7 @@ def get_book_reviews(current_user, book_id):
     reviews_pagination = reviews_query.paginate(page=page, per_page=per_page, error_out=False)
     reviews = reviews_pagination.items
     review_list = [
-        {'id': review.id, 'username': review.user.username, 'review': review.review, 'rating': review.rating}
+        {'id': review.id, 'username': review.user.username, 'review': review.review, 'rating': review.rating, 'user_id': review.user.id}
         for review in reviews
     ]
     return jsonify({
@@ -390,6 +390,7 @@ def get_book_reviews(current_user, book_id):
         'page': page,
         'pages': reviews_pagination.pages
     })
+
 
 @app.route('/user_books/<int:user_id>', methods=['GET'])
 @token_required
