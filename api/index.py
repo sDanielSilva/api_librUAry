@@ -8,7 +8,6 @@ import psycopg2
 from psycopg2.extras import DictCursor
 from psycopg2.extensions import AsIs
 from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app)
@@ -97,9 +96,8 @@ def register():
         return jsonify({'message': 'Username already exists'}), 400
 
     try:
-        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO users (username, password) VALUES (%s, pgp_sym_encrypt(%s, %s))", (username, hashed_password, app.config['SECRET_KEY']))
+            cur.execute("INSERT INTO users (username, password) VALUES (%s, pgp_sym_encrypt(%s, %s))", (username, password, app.config['SECRET_KEY']))
         conn.commit()
         return jsonify({'message': 'Registered successfully!'})
     except Exception as e:
@@ -120,7 +118,7 @@ def login():
         cur.execute("SELECT id, username, pgp_sym_decrypt(password::bytea, %s) as password FROM users WHERE username = %s", (app.config['SECRET_KEY'], username))
         user = cur.fetchone()
     
-    if not user or not check_password_hash(user[2], password):
+    if not user or user[2] != password:
         return jsonify({'message': 'Login failed!'}), 401
 
     token = jwt.encode({
