@@ -214,7 +214,7 @@ def add_review(current_user):
 @token_required
 def get_profile(current_user, user_id):
     try:
-        if current_user['id'] != user_id:
+        if current_user[0] != user_id:
             return jsonify({'message': 'Unauthorized'}), 403
 
         with conn.cursor(cursor_factory=DictCursor) as cur:
@@ -372,7 +372,7 @@ def get_book_reviews(current_user, book_id):
 @app.route('/user_books/<int:user_id>', methods=['GET'])
 @token_required
 def get_user_books(current_user, user_id):
-    if current_user['id'] != user_id:
+    if current_user[0] != user_id:
         return jsonify({'message': 'Unauthorized'}), 403
 
     try:
