@@ -191,16 +191,16 @@ def add_review(current_user):
         return jsonify({'message': 'Book ID, Review text, and Rating are required'}), 400
 
     with conn.cursor() as cur:
-        cur.execute("SELECT * FROM reviews WHERE book_id = %s AND user_id = %s", (book_id, current_user['id']))
+        cur.execute("SELECT * FROM reviews WHERE book_id = %s AND user_id = %s", (book_id, current_user[0]))
         existing_review = cur.fetchone()
 
     if existing_review:
         with conn.cursor() as cur:
-            cur.execute("UPDATE reviews SET review = %s, rating = %s WHERE id = %s", (review_text, rating, existing_review['id']))
+            cur.execute("UPDATE reviews SET review = %s, rating = %s WHERE id = %s", (review_text, rating, existing_review[0]))
         message = 'Review updated successfully!'
     else:
         with conn.cursor() as cur:
-            cur.execute("INSERT INTO reviews (book_id, user_id, review, rating) VALUES (%s, %s, %s, %s)", (book_id, current_user['id'], review_text, rating))
+            cur.execute("INSERT INTO reviews (book_id, user_id, review, rating) VALUES (%s, %s, %s, %s)", (book_id, current_user[0], review_text, rating))
         message = 'Review added successfully!'
 
     try:
