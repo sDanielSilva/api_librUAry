@@ -119,7 +119,7 @@ def login():
         return jsonify({'message': 'Login failed!'}), 401
 
     token = jwt.encode({
-        'user_id': user['id'],
+        'user_id': user[0],
         'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60)
     }, app.config['SECRET_KEY'], algorithm='HS256')
 
