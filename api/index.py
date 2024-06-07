@@ -309,7 +309,7 @@ def mark_book_as_read(current_user):
         return jsonify({'message': 'Book ID is required'}), 400
 
     with conn.cursor() as cur:
-        cur.execute("SELECT * FROM user_books WHERE user_id = %s AND book_id = %s", (current_user['id'], book_id))
+        cur.execute("SELECT * FROM user_books WHERE user_id = %s AND book_id = %s", (current_user[0], book_id))
         user_book = cur.fetchone()
 
     if not user_book:
@@ -335,7 +335,7 @@ def remove_book(current_user):
         return jsonify({'message': 'Book ID is required'}), 400
 
     with conn.cursor() as cur:
-        cur.execute("SELECT * FROM user_books WHERE user_id = %s AND book_id = %s", (current_user['id'], book_id))
+        cur.execute("SELECT * FROM user_books WHERE user_id = %s AND book_id = %s", (current_user[0], book_id))
         user_book = cur.fetchone()
 
     if not user_book:
