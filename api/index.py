@@ -360,16 +360,9 @@ def get_book_reviews(current_user, book_id):
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 5, type=int)
     with conn.cursor(cursor_factory=DictCursor) as cur:
-    cur.execute("""
-        SELECT reviews.id, users.username, reviews.review, reviews.rating, reviews.user_id 
-        FROM reviews 
-        INNER JOIN users ON reviews.user_id = users.id
-        WHERE book_id = %s 
-        ORDER BY id 
-        LIMIT %s OFFSET %s
-    """, (book_id, per_page, (page - 1) * per_page))
-    reviews = cur.fetchall()
-    review_list = [{'id': review['id'], 'username': review['username'], 'review': review['review'], 'rating': review['rating'], 'user_id': review['user_id']} for review in reviews]
+        cur.execute("SELECT reviews.id, users.username, reviews.review, reviews.rating, reviews.user_id FROM reviews INNER JOIN users ON reviews.user_id = users.id WHERE book_id = %s ORDER BY id LIMIT %s OFFSET %s", (book_id, per_page, (page - 1) * per_page))
+        reviews = cur.fetchall()
+        review_list = [{'id': review['id'], 'username': review['username'], 'review': review['review'], 'rating': review['rating'], 'user_id': review['user_id']} for review in reviews]
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM reviews WHERE book_id = %s", (book_id,))
         total_reviews = cur.fetchone()[0]
