@@ -84,9 +84,14 @@ def register():
     if not username or not password:
         return jsonify({'message': 'Username and password are required'}), 400
 
-    with conn.cursor() as cur:
-        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
-        existing_user = cur.fetchone()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+            existing_user = cur.fetchone()
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        conn.commit()
 
     if existing_user:
         return jsonify({'message': 'Username already exists'}), 400
