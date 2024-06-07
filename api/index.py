@@ -283,7 +283,10 @@ def add_book(current_user):
         except requests.exceptions.RequestException as e:
             app.logger.error(f'Error fetching book data from Google Books API: {e}')
             return jsonify({'message': 'Error fetching book data from Google Books API', 'error': str(e)}), 500
-
+        book_id = cur.fetchone()[0]
+    else:
+        book_id = book['id']
+    
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM user_books WHERE user_id = %s AND book_id = %s", (user_id, book_id))
         user_book = cur.fetchone()
@@ -299,6 +302,7 @@ def add_book(current_user):
     except Exception as e:
         app.logger.error(f'Error adding book to user library: {e}')
         return jsonify({'message': 'Error adding book to user library', 'error': str(e)}), 500
+        
 
 @app.route('/mark_book_as_read', methods=['POST'])
 @token_required
