@@ -114,8 +114,8 @@ def login():
     with conn.cursor() as cur:
         cur.execute("SELECT username, pgp_sym_decrypt(password::bytea, %s) as password FROM users WHERE username = %s", (app.config['SECRET_KEY'], username))
         user = cur.fetchone()
-
-    if not user or not check_password_hash(pgcrypt.pgp_sym_decrypt(user['password'], app.config['SECRET_KEY']).decode(), password):
+    
+    if not user or not check_password_hash(user['password'].decode(), password):
         return jsonify({'message': 'Login failed!'}), 401
 
     token = jwt.encode({
