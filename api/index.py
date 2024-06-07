@@ -112,10 +112,10 @@ def login():
         return jsonify({'message': 'Username and password are required'}), 400
 
     with conn.cursor() as cur:
-        cur.execute("SELECT username, pgp_sym_decrypt(password::bytea, %s) as password FROM users WHERE username = %s", (app.config['SECRET_KEY'], username))
+        cur.execute("SELECT id, username, pgp_sym_decrypt(password::bytea, %s) as password FROM users WHERE username = %s", (app.config['SECRET_KEY'], username))
         user = cur.fetchone()
     
-    if not user or not check_password_hash(user[1], password):
+    if not user or not check_password_hash(user[2], password):
         return jsonify({'message': 'Login failed!'}), 401
 
     token = jwt.encode({
