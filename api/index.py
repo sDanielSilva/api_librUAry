@@ -4,65 +4,22 @@ from functools import wraps
 import jwt
 import requests
 from flask import Flask, request, jsonify, send_from_directory
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
+import psycopg2
+from psycopg2.extras import DictCursor
+from psycopg2.extensions import AsIs
 from werkzeug.middleware.proxy_fix import ProxyFix
-#from dotenv import load_dotenv
-#load_dotenv()  
 
-# Configurações do Flask
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app)
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('SQLALCHEMY_DATABASE_URI')
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Inicialização dos componentes do Flask
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
-
-# Modelos
-class User(db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)
-    reviews = db.relationship('Review', order_by='Review.id', back_populates='user')
-    user_books = db.relationship('UserBook', order_by='UserBook.id', back_populates='user')
-
-class Book(db.Model):
-    __tablename__ = 'books'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100))
-    author = db.Column(db.String(100))
-    published_date = db.Column(db.Date)
-    isbn = db.Column(db.String(13), unique=True, nullable=False)
-    language = db.Column(db.String(50))
-    image = db.Column(db.String(255))
-    pages = db.Column(db.Integer)
-    publisher = db.Column(db.String(100))
-    reviews = db.relationship('Review', order_by='Review.id', back_populates='book')
-    user_books = db.relationship('UserBook', order_by='UserBook.id', back_populates='book')
-
-class Review(db.Model):
-    __tablename__ = 'reviews'
-    id = db.Column(db.Integer, primary_key=True)
-    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    review = db.Column(db.Text, nullable=False)
-    rating = db.Column(db.Integer, nullable=False)
-    book = db.relationship('Book', back_populates='reviews')
-    user = db.relationship('User', back_populates='reviews')
-
-class UserBook(db.Model):
-    __tablename__ = 'user_books'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
-    read = db.Column(db.Boolean, default=False)
-    user = db.relationship('User', back_populates='user_books')
-    book = db.relationship('Book', back_populates='user_books')
+conn = psycopg2.connect(
+    dbname=os.environ.get('DB_NAME'),
+    user=os.environ.get('DB_USER'),
+    password=os.environ.get('DB_PASS'),
+    host=os.environ.get('DB_HOST'),
+    port=os.environ.get('DB_PORT')
+)
 
 def token_required(f):
     @wraps(f)
@@ -72,7 +29,9 @@ def token_required(f):
             return jsonify({'error': 'Token is missing!'}), 401
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-            current_user = User.query.get(data['user_id'])
+            with conn.cursor() as cur:
+                cur.execute("SELECT * FROM users WHERE id = %s", (data['user_id'],))
+                current_user = cur.fetchone()
             if not current_user:
                 return jsonify({'error': 'Invalid token'}), 401
         except jwt.ExpiredSignatureError:
@@ -83,7 +42,6 @@ def token_required(f):
     return decorated
 
 
-# Rotas da API
 @app.route('/', methods = ["GET"])
 def home():
     return "Welcome to libruary API!"
@@ -101,24 +59,18 @@ def validate_token():
         return jsonify({'message': 'Token is missing'}), 400
 
     try:
-        # Decodifica o token JWT
         decoded_token = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
 
         exp_date = datetime.datetime.fromtimestamp(decoded_token['exp'], tz=datetime.timezone.utc)
         
-        # Verifica se o token expirou
         if exp_date < datetime.datetime.now(datetime.timezone.utc):
             return jsonify({'is_valid': False, 'message': 'Token has expired'}), 401
         
-        # O token é válido
         return jsonify({'is_valid': True, 'message': 'Token is valid'})
     except jwt.ExpiredSignatureError:
-        # O token expirou
         return jsonify({'is_valid': False, 'message': 'Token has expired'}), 401
     except jwt.InvalidTokenError:
-        # O token é inválido
         return jsonify({'is_valid': False, 'message': 'Invalid token'}), 401
-
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -131,15 +83,18 @@ def register():
     if not username or not password:
         return jsonify({'message': 'Username and password are required'}), 400
 
-    existing_user = User.query.filter_by(username=username).first()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        existing_user = cur.fetchone()
+
     if existing_user:
         return jsonify({'message': 'Username already exists'}), 400
 
     try:
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
-        new_user = User(username=username, password=hashed_password)
-        db.session.add(new_user)
-        db.session.commit()
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO users (username, password) VALUES (%s, pgp_sym_encrypt(%s, %s))", (username, hashed_password, app.config['SECRET_KEY']))
+        conn.commit()
         return jsonify({'message': 'Registered successfully!'})
     except Exception as e:
         return jsonify({'message': 'Registration failed', 'error': str(e)}), 500
@@ -155,56 +110,62 @@ def login():
     if not username or not password:
         return jsonify({'message': 'Username and password are required'}), 400
 
-    user = User.query.filter_by(username=username).first()
-    if not user or not check_password_hash(user.password, password):
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        user = cur.fetchone()
+
+    if not user or not check_password_hash(pgcrypt.pgp_sym_decrypt(user['password'], app.config['SECRET_KEY']).decode(), password):
         return jsonify({'message': 'Login failed!'}), 401
 
-    # Geração do token JWT
     token = jwt.encode({
-        'user_id': user.id,
+        'user_id': user['id'],
         'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60)
     }, app.config['SECRET_KEY'], algorithm='HS256')
 
-    # Inclua o userId na resposta
-    return jsonify({'message': 'Logged in successfully!', 'token': token, 'user_id': user.id})
+    return jsonify({'message': 'Logged in successfully!', 'token': token, 'user_id': user['id']})
 
 @app.route('/books', methods=['GET'])
 def get_books():
     try:
-        books = Book.query.all()
-        output = [{
-            'id': book.id,
-            'title': book.title,
-            'author': book.author,
-            'published_date': book.published_date,
-            'isbn': book.isbn,
-            'language': book.language,
-            'image': book.image,
-            'pages': book.pages,
-            'publisher': book.publisher
-        } for book in books]
-        return jsonify({'books': output})
+        with conn.cursor(cursor_factory=DictCursor) as cur:
+            cur.execute("SELECT * FROM books")
+            books = cur.fetchall()
+            output = [{
+                'id': book['id'],
+                'title': book['title'],
+                'author': book['author'],
+                'published_date': book['published_date'],
+                'isbn': book['isbn'],
+                'language': book['language'],
+                'image': book['image'],
+                'pages': book['pages'],
+                'publisher': book['publisher']
+            } for book in books]
+            return jsonify({'books': output})
     except Exception as e:
         return jsonify({'message': 'Error fetching books', 'error': str(e)}), 500
 
 @app.route('/book/<int:book_id>', methods=['GET'])
 def get_book(book_id):
     try:
-        book = Book.query.get(book_id)
+        with conn.cursor(cursor_factory=DictCursor) as cur:
+            cur.execute("SELECT * FROM books WHERE id = %s", (book_id,))
+            book = cur.fetchone()
         if book is None:
             return jsonify({'message': 'Book not found'}), 404
 
         output = {
-            'id': book.id,
-            'title': book.title,
-            'author': book.author,
-            'published_date': book.published_date,
-            'isbn': book.isbn,
-            'language': book.language,
-            'image': book.image,
-            'pages': book.pages,
-            'publisher': book.publisher
+            'id': book['id'],
+            'title': book['title'],
+            'author': book['author'],
+            'published_date': book['published_date'],
+            'isbn': book['isbn'],
+            'language': book['language'],
+            'image': book['image'],
+            'pages': book['pages'],
+            'publisher': book['publisher']
         }
+
         return jsonify({'book': output})
     except Exception as e:
         return jsonify({'message': 'Error fetching book', 'error': str(e)}), 500
@@ -223,40 +184,48 @@ def add_review(current_user):
     if not book_id or not review_text or rating is None:
         return jsonify({'message': 'Book ID, Review text, and Rating are required'}), 400
 
-    existing_review = Review.query.filter_by(book_id=book_id, user_id=current_user.id).first()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM reviews WHERE book_id = %s AND user_id = %s", (book_id, current_user['id']))
+        existing_review = cur.fetchone()
 
     if existing_review:
-        existing_review.review = review_text
-        existing_review.rating = rating
+        with conn.cursor() as cur:
+            cur.execute("UPDATE reviews SET review = %s, rating = %s WHERE id = %s", (review_text, rating, existing_review['id']))
         message = 'Review updated successfully!'
     else:
-        new_review = Review(book_id=book_id, user_id=current_user.id, review=review_text, rating=rating)
-        db.session.add(new_review)
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO reviews (book_id, user_id, review, rating) VALUES (%s, %s, %s, %s)", (book_id, current_user['id'], review_text, rating))
         message = 'Review added successfully!'
 
     try:
-        db.session.commit()
+        conn.commit()
         return jsonify({'message': message})
     except Exception as e:
         return jsonify({'message': 'Error adding/updating review', 'error': str(e)}), 500
+
 
 @app.route('/profile/<int:user_id>', methods=['GET'])
 @token_required
 def get_profile(current_user, user_id):
     try:
-        if current_user.id != user_id:
+        if current_user['id'] != user_id:
             return jsonify({'message': 'Unauthorized'}), 403
 
-        user = User.query.get(user_id)
+        with conn.cursor(cursor_factory=DictCursor) as cur:
+            cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+            user = cur.fetchone()
+
         if not user:
             return jsonify({'message': 'User not found'}), 404
 
-        reviews = Review.query.filter_by(user_id=user_id).all()
-        review_list = [{'book_id': review.book_id, 'review': review.review, 'rating': review.rating} for review in reviews]
-        return jsonify({'username': user.username, 'reviews': review_list})
+        with conn.cursor(cursor_factory=DictCursor) as cur:
+            cur.execute("SELECT * FROM reviews WHERE user_id = %s", (user_id,))
+            reviews = cur.fetchall()
+
+        review_list = [{'book_id': review['book_id'], 'review': review['review'], 'rating': review['rating']} for review in reviews]
+        return jsonify({'username': user['username'], 'reviews': review_list})
     except Exception as e:
         return jsonify({'message': 'Error fetching profile', 'error': str(e)}), 500
-
 
 @app.route('/add_book', methods=['POST'])
 @token_required
@@ -271,7 +240,9 @@ def add_book(current_user):
     if not isbn or not user_id:
         return jsonify({'message': 'ISBN and user ID are required'}), 400
 
-    book = Book.query.filter_by(isbn=isbn).first()
+    with conn.cursor(cursor_factory=DictCursor) as cur:
+        cur.execute("SELECT * FROM books WHERE isbn = %s", (isbn,))
+        book = cur.fetchone()
 
     if not book:
         google_books_url = f'https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}'
@@ -299,30 +270,25 @@ def add_book(current_user):
 
             published_date = format_published_date(book_info.get('publishedDate', '1000'))
 
-            book = Book(
-                title=title,
-                author=author,
-                published_date=published_date,
-                isbn=isbn,
-                language=language,
-                image=image,
-                pages=pages,
-                publisher=publisher
-            )
-            db.session.add(book)
-            db.session.commit()
+            with conn.cursor() as cur:
+                cur.execute("INSERT INTO books (title, author, published_date, isbn, language, image, pages, publisher) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id", (title, author, published_date, isbn, language, image, pages, publisher))
+                book_id = cur.fetchone()[0]
+            conn.commit()
         except requests.exceptions.RequestException as e:
             app.logger.error(f'Error fetching book data from Google Books API: {e}')
             return jsonify({'message': 'Error fetching book data from Google Books API', 'error': str(e)}), 500
 
-    user_book = UserBook.query.filter_by(user_id=user_id, book_id=book.id).first()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM user_books WHERE user_id = %s AND book_id = %s", (user_id, book_id))
+        user_book = cur.fetchone()
+
     if user_book:
         return jsonify({'message': 'Book already added to user library'}), 400
 
     try:
-        user_book = UserBook(user_id=user_id, book_id=book.id)
-        db.session.add(user_book)
-        db.session.commit()
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO user_books (user_id, book_id) VALUES (%s, %s)", (user_id, book_id))
+        conn.commit()
         return jsonify({'message': 'Book added to user library successfully!'})
     except Exception as e:
         app.logger.error(f'Error adding book to user library: {e}')
@@ -336,17 +302,20 @@ def mark_book_as_read(current_user):
     if not book_id:
         return jsonify({'message': 'Book ID is required'}), 400
 
-    user_book = UserBook.query.filter_by(user_id=current_user.id, book_id=book_id).first()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM user_books WHERE user_id = %s AND book_id = %s", (current_user['id'], book_id))
+        user_book = cur.fetchone()
+
     if not user_book:
         return jsonify({'message': 'Book not found in user library'}), 404
 
     try:
-        user_book.read = True 
-        db.session.commit()
+        with conn.cursor() as cur:
+            cur.execute("UPDATE user_books SET read = TRUE WHERE id = %s", (user_book['id'],))
+        conn.commit()
         return jsonify({'message': 'Book marked as read successfully!'})
     except Exception as e:
         return jsonify({'message': 'Error marking book as read', 'error': str(e)}), 500
-
 
 @app.route('/remove_book', methods=['POST'])
 @token_required
@@ -359,61 +328,67 @@ def remove_book(current_user):
     if not book_id:
         return jsonify({'message': 'Book ID is required'}), 400
 
-    user_book = UserBook.query.filter_by(user_id=current_user.id, book_id=book_id).first()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM user_books WHERE user_id = %s AND book_id = %s", (current_user['id'], book_id))
+        user_book = cur.fetchone()
+
     if not user_book:
         return jsonify({'message': 'Book not found in user library'}), 404
 
     try:
-        db.session.delete(user_book)
-        db.session.commit()
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM user_books WHERE id = %s", (user_book['id'],))
+        conn.commit()
         return jsonify({'message': 'Book removed from user library successfully!'})
     except Exception as e:
         app.logger.error(f'Error removing book from user library: {e}')
         return jsonify({'message': 'Error removing book from user library', 'error': str(e)}), 500
-
 
 @app.route('/book_reviews/<int:book_id>', methods=['GET'])
 @token_required
 def get_book_reviews(current_user, book_id):
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 5, type=int)
-    reviews_query = Review.query.filter_by(book_id=book_id).join(User, Review.user_id == User.id)
-    reviews_pagination = reviews_query.paginate(page=page, per_page=per_page, error_out=False)
-    reviews = reviews_pagination.items
-    review_list = [
-        {'id': review.id, 'username': review.user.username, 'review': review.review, 'rating': review.rating, 'user_id': review.user.id}
-        for review in reviews
-    ]
+    with conn.cursor(cursor_factory=DictCursor) as cur:
+        cur.execute("SELECT * FROM reviews WHERE book_id = %s ORDER BY id LIMIT %s OFFSET %s", (book_id, per_page, (page - 1) * per_page))
+        reviews = cur.fetchall()
+    review_list = [{'id': review['id'], 'username': review['username'], 'review': review['review'], 'rating': review['rating'], 'user_id': review['user_id']} for review in reviews]
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM reviews WHERE book_id = %s", (book_id,))
+        total_reviews = cur.fetchone()[0]
     return jsonify({
         'reviews': review_list,
-        'total_reviews': reviews_query.count(),
+        'total_reviews': total_reviews,
         'page': page,
-        'pages': reviews_pagination.pages
+        'pages': (total_reviews // per_page) + (total_reviews % per_page > 0)
     })
-
 
 @app.route('/user_books/<int:user_id>', methods=['GET'])
 @token_required
 def get_user_books(current_user, user_id):
-    if current_user.id != user_id:
+    if current_user['id'] != user_id:
         return jsonify({'message': 'Unauthorized'}), 403
 
     try:
-        books_to_read = UserBook.query.filter_by(user_id=user_id, read=False).join(Book).all()
-        books_read = UserBook.query.filter_by(user_id=user_id, read=True).join(Book).all()
+        with conn.cursor(cursor_factory=DictCursor) as cur:
+            cur.execute("SELECT * FROM user_books JOIN books ON user_books.book_id = books.id WHERE user_id = %s AND read = FALSE", (user_id,))
+            books_to_read = cur.fetchall()
+        with conn.cursor(cursor_factory=DictCursor) as cur:
+            cur.execute("SELECT * FROM user_books JOIN books ON user_books.book_id = books.id WHERE user_id = %s AND read = TRUE", (user_id,))
+            books_read = cur.fetchall()
 
         books_to_read_output = [{
-            'book_id': user_book.book.id,
-            'title': user_book.book.title,
-            'author': user_book.book.author,
-            'image': user_book.book.image
+            'book_id': user_book['book_id'],
+            'title': user_book['title'],
+            'author': user_book['author'],
+            'image': user_book['image']
         } for user_book in books_to_read]
 
         books_read_output = [{
-            'book_id': user_book.book.id,
-            'title': user_book.book.title,
-            'author': user_book.book.author,
-            'image': user_book.book.image
+            'book_id': user_book['book_id'],
+            'title': user_book['title'],
+            'author': user_book['author'],
+            'image': user_book['image']
         } for user_book in books_read]
 
         return jsonify({
@@ -423,7 +398,6 @@ def get_user_books(current_user, user_id):
     except Exception as e:
         return jsonify({'message': 'Error fetching user books', 'error': str(e)}), 500
 
-# Tratamento de Erros
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'error': 'Not found'}), 404
@@ -436,7 +410,6 @@ def bad_request(error):
 def server_error(error):
     return jsonify({'error': 'Server error'}), 500
 
-# Inicialização do Logger
 if __name__ == '__main__':
     import logging
     logging.basicConfig(filename='api.log', level=logging.INFO)
