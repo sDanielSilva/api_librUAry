@@ -123,7 +123,7 @@ def login():
         'exp': datetime.datetime.utcnow() + datetime.timedelta(minutes=60)
     }, app.config['SECRET_KEY'], algorithm='HS256')
 
-    return jsonify({'message': 'Logged in successfully!', 'token': token, 'user_id': user['id']})
+    return jsonify({'message': 'Logged in successfully!', 'token': token, 'user_id': user[0]})
 
 @app.route('/books', methods=['GET'])
 def get_books():
