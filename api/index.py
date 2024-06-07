@@ -8,7 +8,7 @@ import psycopg2
 from psycopg2.extras import DictCursor
 from psycopg2.extensions import AsIs
 from werkzeug.middleware.proxy_fix import ProxyFix
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app)
