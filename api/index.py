@@ -371,6 +371,22 @@ def get_book_reviews(current_user, book_id):
         'pages': (total_reviews // per_page) + (total_reviews % per_page > 0)
     })
 
+@app.route('/user_rating/<int:user_id>/<int:book_id>', methods=['GET'])
+@token_required
+def get_user_rating(current_user, user_id, book_id):
+    if current_user[0] != user_id:
+        return jsonify({'message': 'Unauthorized'}), 403
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT rating FROM reviews WHERE user_id = %s AND book_id = %s", (user_id, book_id))
+        review = cur.fetchone()
+
+    if review is None:
+        return jsonify({'rating': 0}), 200
+
+    return jsonify({'rating': review[0]}), 200
+
+
 @app.route('/user_books/<int:user_id>', methods=['GET'])
 @token_required
 def get_user_books(current_user, user_id):
