@@ -317,7 +317,7 @@ def mark_book_as_read(current_user):
 
     try:
         with conn.cursor() as cur:
-            cur.execute("UPDATE user_books SET read = TRUE WHERE id = %s", (user_book['id'],))
+            cur.execute("UPDATE user_books SET read = TRUE WHERE id = %s", (user_book[0],))
         conn.commit()
         return jsonify({'message': 'Book marked as read successfully!'})
     except Exception as e:
@@ -343,7 +343,7 @@ def remove_book(current_user):
 
     try:
         with conn.cursor() as cur:
-            cur.execute("DELETE FROM user_books WHERE id = %s", (user_book['id'],))
+            cur.execute("DELETE FROM user_books WHERE id = %s", (user_book[0],))
         conn.commit()
         return jsonify({'message': 'Book removed from user library successfully!'})
     except Exception as e:
