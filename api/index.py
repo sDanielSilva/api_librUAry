@@ -270,7 +270,10 @@ def add_book(current_user):
                 try:
                     return datetime.datetime.strptime(published_date, '%Y-%m-%d').date()
                 except ValueError:
-                    return datetime.datetime.strptime(published_date, '%Y').date().replace(day=1, month=1)
+                    try:
+                        return datetime.datetime.strptime(published_date, '%Y-%m').date().replace(day=1)
+                    except ValueError:
+                        return datetime.datetime.strptime(published_date, '%Y').date().replace(day=1, month=1)
 
             published_date = format_published_date(book_info.get('publishedDate', '1000'))
 
