@@ -319,11 +319,24 @@ def mark_book_as_read(current_user):
 
     try:
         with conn.cursor() as cur:
-            cur.execute("UPDATE user_books SET read = TRUE WHERE id = %s", (user_book[0],))
+            cur.execute("UPDATE user_books SET read = NOT read WHERE id = %s", (user_book[0],))
         conn.commit()
-        return jsonify({'message': 'Book marked as read successfully!'})
+        return jsonify({'message': 'Book read status toggled successfully!'})
     except Exception as e:
-        return jsonify({'message': 'Error marking book as read', 'error': str(e)}), 500
+        return jsonify({'message': 'Error toggling book read status', 'error': str(e)}), 500
+
+@app.route('/user_read/<int:user_id>/<int:book_id>', methods=['GET'])
+@token_required
+def check_user_read_book(current_user, user_id, book_id):
+    if current_user[0] != user_id:
+        return jsonify({'message': 'Unauthorized'}), 403
+
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM user_books WHERE user_id = %s AND book_id = %s AND read = true", (user_id, book_id))
+        read_book_entry = cur.fetchone()
+        
+    has_read = read_book_entry is not None
+    return jsonify({'has_read': has_read}), 200
 
 @app.route('/remove_book', methods=['POST'])
 @token_required
