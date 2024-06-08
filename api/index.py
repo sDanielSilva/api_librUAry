@@ -223,10 +223,10 @@ def get_profile(current_user, user_id):
             return jsonify({'message': 'User not found'}), 404
 
         with conn.cursor(cursor_factory=DictCursor) as cur:
-            cur.execute("SELECT * FROM reviews WHERE user_id = %s", (user_id,))
+            cur.execute("SELECT reviews.book_id, books.title, reviews.review, reviews.rating FROM reviews JOIN books ON reviews.book_id = books.id WHERE reviews.user_id = %s", (user_id,))
             reviews = cur.fetchall()
 
-        review_list = [{'book_id': review['book_id'], 'review': review['review'], 'rating': review['rating']} for review in reviews]
+        review_list = [{'book_id': review['book_id'], 'book_title': review['title'], 'review': review['review'], 'rating': review['rating']} for review in reviews]
         return jsonify({'username': user['username'], 'reviews': review_list})
     except Exception as e:
         return jsonify({'message': 'Error fetching profile', 'error': str(e)}), 500
