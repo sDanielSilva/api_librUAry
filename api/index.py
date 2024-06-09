@@ -143,7 +143,8 @@ def get_books():
                 'language': book['language'],
                 'image': book['image'],
                 'pages': book['pages'],
-                'publisher': book['publisher']
+                'publisher': book['publisher'],
+                'synopsis': book['synopsis']
             } for book in books]
             return jsonify({'books': output})
     except Exception as e:
@@ -167,7 +168,8 @@ def get_book(book_id):
             'language': book['language'],
             'image': book['image'],
             'pages': book['pages'],
-            'publisher': book['publisher']
+            'publisher': book['publisher'],
+            'synopsis': book['synopsis']
         }
 
         return jsonify({'book': output})
