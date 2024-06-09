@@ -281,7 +281,7 @@ def add_book(current_user):
             published_date = format_published_date(book_info.get('publishedDate', '1000'))
 
             with conn.cursor() as cur:
-                cur.execute("INSERT INTO books (title, author, published_date, isbn, language, image, pages, publisher, synopsis) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id", (title, author, published_date, isbn, language, image, pages, publisher))
+                cur.execute("INSERT INTO books (title, author, published_date, isbn, language, image, pages, publisher, synopsis) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id", (title, author, published_date, isbn, language, image, pages, publisher, synopsis))
                 book_id = cur.fetchone()[0]
             conn.commit()
         except requests.exceptions.RequestException as e:
