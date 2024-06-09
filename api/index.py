@@ -241,10 +241,11 @@ def add_book(current_user):
         return jsonify({'message': 'No data provided'}), 400
 
     isbn = data.get('isbn')
-    user_id = data.get('user_id')
 
-    if not isbn or not user_id:
-        return jsonify({'message': 'ISBN and user ID are required'}), 400
+    if not isbn:
+        return jsonify({'message': 'ISBN is required'}), 400
+
+    user_id = current_user[0]
 
     with conn.cursor(cursor_factory=DictCursor) as cur:
         cur.execute("SELECT * FROM books WHERE isbn = %s", (isbn,))
