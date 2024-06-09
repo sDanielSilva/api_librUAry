@@ -144,7 +144,7 @@ def get_books():
                 'image': book['image'],
                 'pages': book['pages'],
                 'publisher': book['publisher'],
-                'synopsis': book['description']
+                'synopsis': book['synopsis']
             } for book in books]
             return jsonify({'books': output})
     except Exception as e:
@@ -169,7 +169,7 @@ def get_book(book_id):
             'image': book['image'],
             'pages': book['pages'],
             'publisher': book['publisher'],
-            'synopsis': book['description']
+            'synopsis': book['synopsis']
         }
 
         return jsonify({'book': output})
@@ -267,6 +267,7 @@ def add_book(current_user):
             image = book_info.get('imageLinks', {}).get('thumbnail')
             pages = book_info.get('pageCount')
             publisher = book_info.get('publisher')
+            synopsis = book_info.get('description')
 
             def format_published_date(published_date):
                 try:
@@ -280,7 +281,7 @@ def add_book(current_user):
             published_date = format_published_date(book_info.get('publishedDate', '1000'))
 
             with conn.cursor() as cur:
-                cur.execute("INSERT INTO books (title, author, published_date, isbn, language, image, pages, publisher) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id", (title, author, published_date, isbn, language, image, pages, publisher))
+                cur.execute("INSERT INTO books (title, author, published_date, isbn, language, image, pages, publisher, synopsis) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id", (title, author, published_date, isbn, language, image, pages, publisher))
                 book_id = cur.fetchone()[0]
             conn.commit()
         except requests.exceptions.RequestException as e:
